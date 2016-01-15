@@ -132,7 +132,9 @@ typedef NS_ENUM(NSUInteger, YYTextMoveDirection) {
     CGFloat _magnifierRangedOffset;
     
     NSRange _highlightRange; ///< current highlight range
+    NSRange _attachmentRange;
     YYTextHighlight *_highlight; ///< highlight attribute in `_highlightRange`
+    YYTextAttachment *_attachment;
     YYTextLayout *_highlightLayout; ///< when _state.showingHighlight=YES, this layout should be displayed
     YYTextRange *_trackingRange; ///< the range in _innerLayout, may out of _innerText.
     
@@ -1160,6 +1162,34 @@ typedef NS_ENUM(NSUInteger, YYTextMoveDirection) {
     if (!shouldTap && !shouldLongPress) return nil;
     if (range) *range = highlightRange;
     return highlight;
+}
+
+- (YYTextAttachment *)_getAttachmentAtPoint:(CGPoint)point range:(NSRangePointer)range {
+    point = [self _convertPointToLayout:point];
+    YYTextRange *textRange = [_innerLayout textRangeAtPoint:point];
+    textRange = [self _correctedTextRange:textRange];
+    if (!textRange) return nil;
+    NSUInteger startIndex = textRange.start.offset;
+    if (startIndex == _innerText.length) {
+        if (startIndex == 0) return nil;
+        else startIndex--;
+    }
+    NSRange attachmentRange = {0};
+    NSAttributedString *text = _delectedText ? _delectedText : _innerText;
+    YYTextAttachment *attachment = [text attribute:YYTextAttachmentAttributeName
+                                         atIndex:startIndex
+                           longestEffectiveRange:&attachmentRange
+                                         inRange:NSMakeRange(0, _innerText.length)];
+    if (!attachment) return nil;
+
+    BOOL shouldTap = YES;
+    if ([self.delegate respondsToSelector:@selector(textView:shuoldTapAttachment:inRange:)]) {
+        shouldTap = [self.delegate textView:self shuoldTapAttachment:attachment inRange:attachmentRange];
+    }
+    if (!shouldTap) return nil;
+    if (range) *range = attachmentRange;
+    return attachment;
+
 }
 
 /// Return the ranged magnifier popover offset from the baseline, base on `_trackingPoint`.
@@ -2495,7 +2525,9 @@ typedef NS_ENUM(NSUInteger, YYTextMoveDirection) {
     _state.trackingTouch = YES;
     _state.swallowTouch = YES;
     _state.touchMoved = NO;
-    
+
+    _attachment = [self _getAttachmentAtPoint:point range:&_attachmentRange];
+
     if (!self.isFirstResponder && !_state.selectedWithoutEdit && self.highlightable) {
         _highlight = [self _getHighlightAtPoint:point range:&_highlightRange];
         _highlightLayout = nil;
@@ -2623,7 +2655,19 @@ typedef NS_ENUM(NSUInteger, YYTextMoveDirection) {
     }
     if (_state.trackingTouch) {
         [self _hideMagnifier];
-        
+
+        if (_attachment) {
+            BOOL shouldTap = YES;
+            if ([self.delegate respondsToSelector:@selector(textView:shuoldTapAttachment:inRange:)]) {
+                shouldTap = [self.delegate textView:self shuoldTapAttachment:_attachment inRange:_attachmentRange];
+            }
+            if (shouldTap && [self.delegate respondsToSelector:@selector(textView:didTapAttachment:inRange:rect:)]) {
+                CGRect rect = [_innerLayout rectForRange:[YYTextRange rangeWithRange:_attachmentRange]];
+                rect = [self _convertRectFromLayout:rect];
+                [self.delegate textView:self didTapAttachment:_attachment inRange:_attachmentRange rect:rect];
+            }
+        }
+
         if (_highlight) {
             if (_state.showingHighlight) {
                 if (_highlight.tapAction) {
