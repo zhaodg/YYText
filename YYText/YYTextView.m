@@ -848,7 +848,21 @@ typedef NS_ENUM(NSUInteger, YYTextMoveDirection) {
             }
         }
     }
-    
+
+    {
+        BOOL shouldAttachment = YES;
+        if ([self.delegate respondsToSelector:@selector(textView:shouldLongPressAttachment:inRange:)]) {
+            shouldAttachment = [self.delegate textView:self shouldLongPressAttachment:_attachment inRange:_attachmentRange];
+        }
+        if (shouldAttachment && _attachment && [self.delegate respondsToSelector:@selector(textView:didLongPressAttachment:inRange:rect:)]) {
+            dealLongPressAction = YES;
+            CGRect rect = [_innerLayout rectForRange:[YYTextRange rangeWithRange:_attachmentRange]];
+            rect = [self _convertRectFromLayout:rect];
+            [self.delegate textView:self didLongPressAttachment:_attachment inRange:_attachmentRange rect:rect];
+            [self _endTouchTracking];
+        }
+    }
+
     if (!dealLongPressAction){
         [self _removeHighlightAnimated:NO];
         if (_state.trackingTouch) {
@@ -1182,11 +1196,14 @@ typedef NS_ENUM(NSUInteger, YYTextMoveDirection) {
                                          inRange:NSMakeRange(0, _innerText.length)];
     if (!attachment) return nil;
 
-    BOOL shouldTap = YES;
+    BOOL shouldTap = YES, shouldLongPress = YES;
     if ([self.delegate respondsToSelector:@selector(textView:shuoldTapAttachment:inRange:)]) {
         shouldTap = [self.delegate textView:self shuoldTapAttachment:attachment inRange:attachmentRange];
     }
-    if (!shouldTap) return nil;
+    if ([self.delegate respondsToSelector:@selector(textView:shouldLongPressAttachment:inRange:)]) {
+        shouldLongPress = [self.delegate textView:self shouldLongPressAttachment:attachment inRange:attachmentRange];
+    }
+    if (!shouldTap && !shouldLongPress) return nil;
     if (range) *range = attachmentRange;
     return attachment;
 

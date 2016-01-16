@@ -47,6 +47,8 @@
 
 - (BOOL)textView:(YYTextView *)textView shuoldTapAttachment:(YYTextAttachment *)attachment inRange:(NSRange)characterRange;
 - (void)textView:(YYTextView *)textView didTapAttachment:(YYTextAttachment *)attachment  inRange:(NSRange)characterRange rect:(CGRect)rect;
+- (BOOL)textView:(YYTextView *)textView shouldLongPressAttachment:(YYTextAttachment *)attachment inRange:(NSRange)characterRange;
+- (void)textView:(YYTextView *)textView didLongPressAttachment:(YYTextAttachment *)attachment inRange:(NSRange)characterRange rect:(CGRect)rect;
 
 @end
 
